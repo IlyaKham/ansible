@@ -1,53 +1,95 @@
-# Самостоятельное практическое задание "Работа с Playbook"
+# Ansible Playbook для установки ClickHouse, Vector и LightHouse на CentOS 7
 
-PLAY [Install Clickhouse] **********************************************************************************************
+## 📖 Описание
 
-TASK [Gathering Facts] *************************************************************************************************
-ok: [clickhouse-01]
+Данный playbook автоматизирует установку и настройку трёх сервисов на отдельных серверах CentOS 7:
 
-TASK [Install clickhouse packages directly from URLs] ******************************************************************
-ok: [clickhouse-01]
+- **ClickHouse** (v22.3.3.44) - колоночная СУБД для аналитики и хранения логов
+- **Vector** (v0.21.1) - инструмент для сбора, трансформации и маршрутизации логов
+- **LightHouse** - легковесный веб-интерфейс для ClickHouse
 
-TASK [Ensure clickhouse-server is running] *****************************************************************************
-ok: [clickhouse-01]
+Playbook учитывает все особенности CentOS 7:
+- Использование Python 2 для ClickHouse (совместимость с yum)
+- Использование Python 3 для Vector и LightHouse
+- Настройка SELinux для Nginx
+- Установка EPEL репозитория для nginx
+- Настройка ClickHouse для приёма внешних подключений
 
-TASK [Create database if not exists] ***********************************************************************************
-changed: [clickhouse-01]
+## ⚙️ Требования к управляющей машине
 
-PLAY [Install and configure Vector] ************************************************************************************
+### Версии Ansible
 
-TASK [Create vector user] **********************************************************************************************
-ok: [clickhouse-01]
+**Важно:** Для работы с CentOS 7 требуется использовать **Ansible 4.10.0** (ansible-core 2.11.x), так как более новые версии требуют Python 3.8+ на целевых хостах.
 
-TASK [Create vector directories] ***************************************************************************************
-ok: [clickhouse-01] => (item=/opt/vector)
-ok: [clickhouse-01] => (item=/etc/vector)
+| Компонент | Требуемая версия | Причина |
+|-----------|-----------------|---------|
+| **Ansible** | 4.10.0 | Совместимость с Python 3.6 на CentOS 7 |
+| **ansible-core** | 2.11.x | Поддержка старых версий Python |
+| **Python** | 3.6+ | На управляющей машине |
 
-TASK [Download Vector archive] *****************************************************************************************
-ok: [clickhouse-01]
+### Создание виртуального окружения
 
-TASK [Extract Vector archive] ******************************************************************************************
-ok: [clickhouse-01]
+Рекомендуется использовать виртуальное окружение для изоляции зависимостей:
 
-TASK [Create symlink to vector binary] *********************************************************************************
-ok: [clickhouse-01]
+```bash
+# Установите Python 3.6+ на управляющей машине
+# Создайте виртуальное окружение
+python3 -m venv ansible-env
 
-TASK [Deploy Vector configuration] *************************************************************************************
-changed: [clickhouse-01]
+# Активируйте окружение
+source ansible-env/bin/activate
 
-TASK [Create Vector systemd service] ***********************************************************************************
-ok: [clickhouse-01]
+# Установите совместимую версию Ansible
+pip install 'ansible==4.10.0'
 
-TASK [Start and enable Vector service] *********************************************************************************
-ok: [clickhouse-01]
+# Проверьте версию
+ansible --version
+# Должно быть: ansible [core 2.11.x]
 
-RUNNING HANDLER [Restart vector service] *******************************************************************************
-changed: [clickhouse-01]
+Альтернативная установка без venv
+bash
+# Установка глобально (не рекомендуется)
+pip install 'ansible==4.10.0'
 
-PLAY RECAP *************************************************************************************************************
-clickhouse-01              : ok=13   changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+# Или через пакетный менеджер (если доступен)
+sudo yum install ansible-4.10.0
 
-<img width="1209" height="400" alt="Снимок экрана 2026-04-08 142949" src="https://github.com/user-attachments/assets/09af6788-6c76-47d5-9d3e-f73e5d614aab" />
-<img width="1215" height="443" alt="Снимок экрана 2026-04-08 143009" src="https://github.com/user-attachments/assets/3da2aac9-27f6-4817-82ad-ee58985b7b7e" />
+Cтруктура
+ansible_part2/
+├── inventory/
+│   └── prod.yml                 # Inventory файл с хостами
+├── group_vars/
+│   ├── clickhouse/
+│   │   └── vars.yml             # Переменные ClickHouse
+│   ├── vector/
+│   │   └── vars.yml             # Переменные Vector
+│   └── lighthouse/
+│       └── vars.yml             # Переменные LightHouse
+├── templates/
+│   ├── vector.toml.j2           # Шаблон конфига Vector
+│   ├── vector.service.j2        # Шаблон systemd сервиса Vector
+│   └── nginx_lighthouse.conf.j2 # Шаблон конфига Nginx
+├── site.yml                     # Основной playbook
+├── ansible.cfg                  # Конфигурация Ansible
+├── .gitignore                   # Игнорируемые файлы
+└── README.md                    # Документация
 
+Playbook поддерживает теги для выборочного запуска:
 
+Тег	Описание
+clickhouse	Установка и настройка только ClickHouse
+vector	Установка и настройка только Vector
+lighthouse	Установка и настройка только LightHouse
+Примеры использования тегов:
+bash
+# Установка только ClickHouse
+ansible-playbook -i inventory/prod.yml site.yml --tags clickhouse --diff
+
+# Установка только Vector
+ansible-playbook -i inventory/prod.yml site.yml --tags vector --diff
+
+# Установка только LightHouse
+ansible-playbook -i inventory/prod.yml site.yml --tags lighthouse --diff
+
+# Установка всех сервисов
+ansible-playbook -i inventory/prod.yml site.yml --dif
