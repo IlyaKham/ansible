@@ -1,0 +1,19 @@
+[Unit]
+Description=Vector Observability Pipeline
+Documentation=https://vector.dev
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ vector_user }}
+Group={{ vector_user }}
+ExecStartPre=/usr/local/bin/vector validate --config-dir {{ vector_config_dir }}
+ExecStart=/usr/local/bin/vector --config-dir {{ vector_config_dir }}
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+RestartPreventExitStatus=255
+
+[Install]
+WantedBy=multi-user.target
