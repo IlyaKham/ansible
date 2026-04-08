@@ -1,3 +1,5 @@
+# Самостоятельное практическое задание "Работа с Playbook"
+
 PLAY [Install Clickhouse] **********************************************************************************************
 
 TASK [Gathering Facts] *************************************************************************************************
@@ -44,3 +46,8 @@ changed: [clickhouse-01]
 
 PLAY RECAP *************************************************************************************************************
 clickhouse-01              : ok=13   changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+<img width="1209" height="400" alt="Снимок экрана 2026-04-08 142949" src="https://github.com/user-attachments/assets/09af6788-6c76-47d5-9d3e-f73e5d614aab" />
+<img width="1215" height="443" alt="Снимок экрана 2026-04-08 143009" src="https://github.com/user-attachments/assets/3da2aac9-27f6-4817-82ad-ee58985b7b7e" />
+
+
