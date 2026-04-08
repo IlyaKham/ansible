@@ -1,6 +1,7 @@
 ---
 - name: Install Clickhouse
   hosts: clickhouse
+  tags: clickhouse
   become: true
   vars_files:
     - group_vars/clickhouse/vars.yml
@@ -20,11 +21,24 @@
         state: present
       notify: Start clickhouse service
 
+    - name: Configure ClickHouse to listen on all interfaces
+      ansible.builtin.replace:
+        path: /etc/clickhouse-server/config.xml
+        regexp: '<!-- <listen_host>0.0.0.0<\/listen_host> -->'
+        replace: '<listen_host>0.0.0.0</listen_host>'
+      notify: Start clickhouse service
+
     - name: Ensure clickhouse-server is running
       ansible.builtin.systemd:
         name: clickhouse-server
         state: started
         enabled: true
+
+    - name: Wait for ClickHouse to start
+      ansible.builtin.wait_for:
+        port: 8123
+        delay: 5
+        timeout: 30
 
     - name: Create database if not exists
       ansible.builtin.command: clickhouse-client -q "CREATE DATABASE IF NOT EXISTS logs"
@@ -34,6 +48,7 @@
 
 - name: Install and configure Vector
   hosts: vector
+  tags: vector
   vars:
     vector_version: "0.21.1"
     vector_install_dir: "/opt/vector"
@@ -66,6 +81,8 @@
       loop:
         - "{{ vector_install_dir }}"
         - "{{ vector_config_dir }}"
+        - "/var/log/vector"
+        - "/var/lib/vector"
 
     - name: Download Vector archive
       become: true
@@ -82,6 +99,7 @@
         remote_src: true
         owner: "{{ vector_user }}"
         group: "{{ vector_user }}"
+        mode: "0755"
         extra_opts:
           - "--strip-components=2"
 
@@ -91,6 +109,7 @@
         src: "{{ vector_install_dir }}/bin/vector"
         dest: "/usr/local/bin/vector"
         state: link
+        mode: "0755"
 
     - name: Deploy Vector configuration
       become: true
@@ -119,3 +138,102 @@
         state: started
         enabled: true
         daemon_reload: true
+
+- name: Install and configure LightHouse
+  hosts: lighthouse
+  tags: lighthouse
+  become: true
+  vars_files:
+    - group_vars/lighthouse/vars.yml
+  handlers:
+    - name: Restart nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+        enabled: true
+  tasks:
+    - name: Install EPEL repository (required for nginx on CentOS 7)
+      ansible.builtin.yum:
+        name: epel-release
+        state: present
+
+    - name: Install git and nginx
+      ansible.builtin.yum:
+        name:
+          - git
+          - nginx
+        state: present
+
+    - name: Create lighthouse directory
+      ansible.builtin.file:
+        path: "{{ lighthouse_install_dir }}"
+        state: directory
+        owner: nginx
+        group: nginx
+        mode: "0755"
+
+    - name: Clone LightHouse repository
+      ansible.builtin.git:
+        repo: "{{ lighthouse_repo }}"
+        dest: "{{ lighthouse_install_dir }}"
+        version: "{{ lighthouse_version }}"
+        force: yes
+      become_user: nginx
+      become: true
+
+    - name: Ensure correct permissions for lighthouse
+      ansible.builtin.file:
+        path: "{{ lighthouse_install_dir }}"
+        state: directory
+        owner: nginx
+        group: nginx
+        recurse: yes
+        mode: "0755"
+
+    - name: Create LightHouse config with ClickHouse URL
+      ansible.builtin.copy:
+        dest: "{{ lighthouse_install_dir }}/config.js"
+        content: |
+          window.CLICKHOUSE_URL = 'http://{{ clickhouse_host }}:{{ clickhouse_port }}';
+        owner: nginx
+        group: nginx
+        mode: "0644"
+
+    - name: Deploy Nginx configuration for LightHouse
+      ansible.builtin.template:
+        src: templates/nginx_lighthouse.conf.j2
+        dest: /etc/nginx/conf.d/lighthouse.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart nginx
+
+    - name: Remove default Nginx configuration
+      ansible.builtin.file:
+        path: /etc/nginx/conf.d/default.conf
+        state: absent
+      notify: Restart nginx
+
+    - name: Disable default server block in nginx.conf
+      ansible.builtin.replace:
+        path: /etc/nginx/nginx.conf
+        regexp: '^(\s+server\s+\{)'
+        replace: '#\1'
+        backup: yes
+      notify: Restart nginx
+
+    - name: Configure SELinux for Nginx network access
+      ansible.builtin.command:
+        cmd: setsebool -P httpd_can_network_connect 1
+      changed_when: false
+
+    - name: Configure SELinux context for lighthouse directory
+      ansible.builtin.command:
+        cmd: chcon -R -t httpd_sys_content_t {{ lighthouse_install_dir }}
+      changed_when: false
+
+    - name: Start and enable Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: true
