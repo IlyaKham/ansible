@@ -1,0 +1,7 @@
+---
+lighthouse_version: "master"
+lighthouse_repo: "https://github.com/VKCOM/lighthouse.git"
+lighthouse_install_dir: "/var/www/lighthouse"
+nginx_port: 80
+clickhouse_host: "213.165.209.175"
+clickhouse_port: 8123
