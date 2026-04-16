@@ -1,0 +1,14 @@
+---
+- name: Use create_file role
+  hosts: localhost
+  gather_facts: no
+  
+  roles:
+    - role: create_file
+      vars:
+        file_path: "/tmp/role_created_file.txt"
+        file_content: |
+          This file was created by the role
+          Using my custom module
+          Test completed successfully!
+        debug_enabled: true

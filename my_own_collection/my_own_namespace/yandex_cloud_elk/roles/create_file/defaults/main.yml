@@ -1,0 +1,5 @@
+---
+# Defaults for create_file role
+file_path: "/tmp/default_file.txt"
+file_content: "Default content from role"
+debug_enabled: false

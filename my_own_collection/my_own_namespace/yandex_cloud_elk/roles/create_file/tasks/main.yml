@@ -1,0 +1,12 @@
+---
+# Tasks for create_file role
+- name: Create file using custom module
+  my_own_namespace.yandex_cloud_elk.my_file_module:
+    path: "{{ file_path }}"
+    content: "{{ file_content }}"
+  register: file_creation_result
+
+- name: Display file creation result
+  debug:
+    var: file_creation_result
+  when: debug_enabled | bool
